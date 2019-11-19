@@ -8,3 +8,5 @@
 ./code2vec-c-master/__pycache__
 __pycache__
 ./code2vec-c-master/interactive/__pycache__
+./code2vec-c-master/interactive/result.txt
+./code2vec-c-master/interactive/function.c
