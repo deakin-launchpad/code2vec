@@ -1,0 +1,12 @@
+cparser.py', "--clang-path /usr/lib/llvm-6.0/lib/libclang.so --max-leaves 32
+
+
+--dir /home/ndzung/DeaKin/code2vec-master/code2vec-c-master/VulDeePecker-master --outdir /home/ndzung/DeaKin/code2vec-master/data6/git-repos-3 -maxleaves 32 --num_threads 64 --clang-path /usr/lib/llvm-6.0/lib/libclang.so --include-path /home/ndzung/DeaKin/code2vec-master/code2vec-c-master/VulDeePecker-master
+
+
+--dir /home/ndzung/DeaKin/code2vec-master/code2vec-c-master/VulDeePecker-master --outdir /home/ndzung/DeaKin/code2vec-master/data6/git-repos-3 -maxleaves 32 --num_threads 64 --clang-path /usr/lib/llvm-6.0/lib/libclang.so --include-path /home/ndzung/DeaKin/code2vec-master/code2vec-c-master/VulDeePecker-master
+
+--dir /home/ndzung/DeaKin/code2vec-master/code2vec-c-master/VulDeePecker-master --outdir /home/ndzung/DeaKin/code2vec-master/data6/git-repos-3 -maxleaves 32 --num_threads 64 --clang-path /usr/lib/llvm-6.0/lib/libclang.so --include-path /home/ndzung/DeaKin/code2vec-master/code2vec-c-master/VulDeePecker-master
+
+
+cod2vec setting parameters --train_data /home/dung/Downloads/hpc3/DeaKin/code2vec-master/data/git-repos-32/git-repos-32.train.raw.txt --test_data /home/dung/Downloads/hpc3/DeaKin/code2vec-master/data/git-repos-32/git-repos-32.test.raw.txt --val_data /home/dung/Downloads/hpc3/DeaKin/code2vec-master/data/git-repos-32git-repos-32.val.raw --max_contexts 200 --word_vocab_size 1301136--path_vocab_size 911417 --target_vocab_size 261245 --word_histogram /home/dung/Downloads/hpc3/DeaKin/code2vec-master/data/git-repos-32.histo.ori.c2v --path_histogram /home/dung/Downloads/hpc3/DeaKin/code2vec-master/data/git-repos-32.histo.path.c2v --target_histogram /home/dung/Downloads/hpc3/DeaKin/code2vec-master/data/git-repos-32.histo.tgt.c2v --output_name /home/dung/Downloads/hpc3/DeaKin/code2vec-master/data1/git-repos-32

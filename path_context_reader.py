@@ -5,6 +5,7 @@ from vocabularies import Code2VecVocabs
 import abc
 from functools import reduce
 from enum import Enum
+import pdb
 
 
 class EstimatorAction(Enum):
@@ -66,11 +67,13 @@ class ModelInputTensorsFormer(abc.ABC):
 
 class PathContextReader:
     def __init__(self,
+
                  vocabs: Code2VecVocabs,
                  config: Config,
                  model_input_tensors_former: ModelInputTensorsFormer,
                  estimator_action: EstimatorAction,
                  repeat_endlessly: bool = False):
+        #self.sess = tf.compat.v1.Session()
         self.vocabs = vocabs
         self.config = config
         self.model_input_tensors_former = model_input_tensors_former
@@ -95,6 +98,15 @@ class PathContextReader:
 
     @tf.function
     def process_input_row(self, row_placeholder):
+        init_op = tf.compat.v1.global_variables_initializer()
+        x = tf.constant([1.0, 3.0])
+        # b = tf.add(x, x)
+        # x = tf.Print(x, [x], message="Test")
+
+        #row_parts = list(row_parts)
+        # a__ = row_parts
+        #target_str = row_parts[0]
+
         parts = tf.io.decode_csv(
             row_placeholder, record_defaults=self.csv_record_defaults, field_delim=' ', use_quote_delim=False)
         # Note: we DON'T apply the filter `_filter_input_rows()` here.
@@ -104,7 +116,13 @@ class PathContextReader:
         tensors_expanded = ReaderInputTensors(
             **{name: None if tensor is None else tf.expand_dims(tensor, axis=0)
                for name, tensor in tensors._asdict().items()})
+        with tf.compat.v1.Session() as sess:
+            # Run the variable initializer.
+            sess.run(init_op)
+            b = sess.run(tf.add(x, x))
+            #t = sess.run(tensors)
         return self.model_input_tensors_former.to_model_input_form(tensors_expanded)
+
 
     def process_and_iterate_input_from_data_lines(self, input_data_lines: Iterable) -> Iterable:
         for data_row in input_data_lines:
@@ -137,7 +155,7 @@ class PathContextReader:
             if not self.repeat_endlessly and self.config.NUM_TRAIN_EPOCHS > 1:
                 dataset = dataset.repeat(self.config.NUM_TRAIN_EPOCHS)
             dataset = dataset.shuffle(self.config.SHUFFLE_BUFFER_SIZE, reshuffle_each_iteration=True)
-
+        # self._row_parts, self.model_input_tensors_former.to_model_input_form(tensors)
         dataset = dataset.map(self._map_raw_dataset_row_to_expected_model_input_form,
                               num_parallel_calls=self.config.READER_NUM_PARALLEL_BATCHES)
         batch_size = self.config.batch_size(is_evaluating=self.estimator_action.is_evaluate)
@@ -147,13 +165,14 @@ class PathContextReader:
             dataset = dataset.filter(self._filter_input_rows)
             dataset = dataset.batch(batch_size)
 
-        dataset = dataset.prefetch(buffer_size=40)  # original: tf.contrib.data.AUTOTUNE) -- got OOM err; 10 seems promising.
+        dataset = dataset.prefetch(
+            buffer_size=40)  # original: tf.contrib.data.AUTOTUNE) -- got OOM err; 10 seems promising.
         return dataset
 
     def _filter_input_rows(self, *row_parts) -> tf.bool:
         row_parts = self.model_input_tensors_former.from_model_input_form(row_parts)
 
-        #assert all(tensor.shape == (self.config.MAX_CONTEXTS,) for tensor in
+        # assert all(tensor.shape == (self.config.MAX_CONTEXTS,) for tensor in
         #           {row_parts.path_source_token_indices, row_parts.path_indices,
         #            row_parts.path_target_token_indices, row_parts.context_valid_mask})
 
@@ -171,7 +190,8 @@ class PathContextReader:
             cond = any_contexts_is_valid  # scalar
         else:  # training
             word_is_valid = tf.greater(
-                row_parts.target_index, self.vocabs.target_vocab.word_to_index[self.vocabs.target_vocab.special_words.OOV])  # scalar
+                row_parts.target_index,
+                self.vocabs.target_vocab.word_to_index[self.vocabs.target_vocab.special_words.OOV])  # scalar
             cond = tf.logical_and(word_is_valid, any_contexts_is_valid)  # scalar
 
         return cond  # scalar
@@ -179,11 +199,38 @@ class PathContextReader:
     def _map_raw_dataset_row_to_expected_model_input_form(self, *row_parts) -> \
             Tuple[Union[tf.Tensor, Tuple[tf.Tensor, ...], Dict[str, tf.Tensor]], ...]:
         tensors = self._map_raw_dataset_row_to_input_tensors(*row_parts)
+
         return self.model_input_tensors_former.to_model_input_form(tensors)
 
     def _map_raw_dataset_row_to_input_tensors(self, *row_parts) -> ReaderInputTensors:
+        init_op = tf.compat.v1.global_variables_initializer()
+        x = tf.constant([1.0, 3.0])
+        #b = tf.add(x, x)
+        #x = tf.Print(x, [x], message="Test")
+
         row_parts = list(row_parts)
+        # a__ = row_parts
         target_str = row_parts[0]
+
+        #target_str = ['CWE399','CWE399']
+        with tf.compat.v1.Session() as sess:
+            # Run the variable initializer.
+            sess.run(init_op)
+            b = sess.run(tf.add(x, x))
+        #c = self.sess.run(row_parts.target_index)
+            #d = sess.run(row_parts)
+
+            #init = (tf.global_variables_initializer(), tf.local_variables_initializer())
+
+        #with tf.Session() as sess:
+         #   sess.run(init)
+         #   print(sess.run(b))
+          #  sess.close()
+        #self._initialize_session_variables()
+            #g=sess.run(row_parts)
+            #t=sess.run(target_str)
+        #a____ = self.sess.run(row_parts)
+
         target_index = self.vocabs.target_vocab.lookup_index(target_str)
 
         contexts_str = tf.stack(row_parts[1:(self.config.MAX_CONTEXTS + 1)], axis=0)
@@ -208,12 +255,16 @@ class PathContextReader:
 
         # FIXME: Does "valid" here mean just "no padding" or "neither padding nor OOV"? I assumed just "no padding".
         valid_word_mask_per_context_part = [
-            tf.not_equal(path_source_token_indices, self.vocabs.token_vocab.word_to_index[self.vocabs.token_vocab.special_words.PAD]),
-            tf.not_equal(path_target_token_indices, self.vocabs.token_vocab.word_to_index[self.vocabs.token_vocab.special_words.PAD]),
-            tf.not_equal(path_indices, self.vocabs.path_vocab.word_to_index[self.vocabs.path_vocab.special_words.PAD])]  # [(max_contexts, )]
-        context_valid_mask = tf.cast(reduce(tf.logical_or, valid_word_mask_per_context_part), dtype=tf.float32)  # (max_contexts, )
+            tf.not_equal(path_source_token_indices,
+                         self.vocabs.token_vocab.word_to_index[self.vocabs.token_vocab.special_words.PAD]),
+            tf.not_equal(path_target_token_indices,
+                         self.vocabs.token_vocab.word_to_index[self.vocabs.token_vocab.special_words.PAD]),
+            tf.not_equal(path_indices, self.vocabs.path_vocab.word_to_index[
+                self.vocabs.path_vocab.special_words.PAD])]  # [(max_contexts, )]
+        context_valid_mask = tf.cast(reduce(tf.logical_or, valid_word_mask_per_context_part),
+                                     dtype=tf.float32)  # (max_contexts, )
 
-        #assert all(tensor.shape == (self.config.MAX_CONTEXTS,) for tensor in {path_source_token_indices, path_indices, path_target_token_indices, context_valid_mask})
+        # assert all(tensor.shape == (self.config.MAX_CONTEXTS,) for tensor in {path_source_token_indices, path_indices, path_target_token_indices, context_valid_mask})
 
         return ReaderInputTensors(
             path_source_token_indices=path_source_token_indices,
@@ -224,5 +275,5 @@ class PathContextReader:
             target_string=target_str,
             path_source_token_strings=path_source_token_strings,
             path_strings=path_strings,
-            path_target_token_strings=path_target_token_strings
+            path_target_token_strings=path_target_token_strings,
         )

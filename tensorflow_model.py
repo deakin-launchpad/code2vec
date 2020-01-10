@@ -11,6 +11,7 @@ from vocabularies import VocabType
 from config import Config
 from model_base import Code2VecModelBase, ModelEvaluationResults, ModelPredictionResults
 
+import pdb
 
 tf.compat.v1.disable_eager_execution()
 
@@ -45,15 +46,20 @@ class Code2VecModel(Code2VecModelBase):
         sum_loss = 0
         multi_batch_start_time = time.time()
         num_batches_to_save_and_eval = max(int(self.config.train_steps_per_epoch * self.config.SAVE_EVERY_EPOCHS), 1)
-
+        # pdb.set_trace()
         train_reader = PathContextReader(vocabs=self.vocabs,
                                          model_input_tensors_former=_TFTrainModelInputTensorsFormer(),
                                          config=self.config, estimator_action=EstimatorAction.Train)
+
         input_iterator = tf.compat.v1.data.make_initializable_iterator(train_reader.get_dataset())
         input_iterator_reset_op = input_iterator.initializer
-        input_tensors = input_iterator.get_next()
 
-        optimizer, train_loss = self._build_tf_training_graph(input_tensors)
+        input_tensors = input_iterator.get_next()
+        #input_tensors1 = _TFTrainModelInputTensorsFormer().from_model_input_form(input_tensors)
+        input_tensors2 = _TFTrainModelInputTensorsFormer().from_model_input_form(input_tensors)
+
+        # optimizer, loss, tf.argmax(logits, 1), loss1, tf.reshape(input_tensors.target_index, [-1]), logits
+        optimizer, train_loss, logits, accuracy, label, input_tensors1 = self._build_tf_training_graph(input_tensors)
         self.saver = tf.compat.v1.train.Saver(max_to_keep=self.config.MAX_TO_KEEP)
 
         self.log('Number of trainable params: {}'.format(
@@ -63,6 +69,9 @@ class Code2VecModel(Code2VecModelBase):
                 variable.name, variable.get_shape(), np.prod(variable.get_shape().as_list())))
 
         self._initialize_session_variables()
+        #loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(
+        #    labels=tf.reshape(input_tensors1.target_index, [-1]),
+        #    logits=logits)) / batch_size
 
         if self.config.MODEL_LOAD_PATH:
             self._load_inner_model(self.sess)
@@ -74,12 +83,41 @@ class Code2VecModel(Code2VecModelBase):
         try:
             while True:
                 # Each iteration = batch. We iterate as long as the tf iterator (reader) yields batches.
+                #labels = tf.reshape(input_tensors1.target_string, [-1])
                 batch_num += 1
-
+                #labels = tf.reshape(input_tensors1.target_string, [-1])
+                labels_ = self.sess.run(label)
+                tensor = self.sess.run(input_tensors2.target_index)
                 # Actual training for the current batch.
                 _, batch_loss = self.sess.run([optimizer, train_loss])
 
+                #acc = self.sess.run(tf.shape(arg))
+
+                #loss1_ = self.sess.run(loss1)
+                label_ = self.sess.run(label)
+                #correct = self.sess.run(correct)
+                #target = self.sess(target)
+                #acc = self.sess.run(accuracy)
+                #l1_ = tf.argmax(logit,1)
+                #l1 = self.sess.run(tf.argmax(logit, 1))
+
+                #loss1 = tf.nn.sparse_softmax_cross_entropy_with_logits(
+                #    labels=tf.reshape(input_tensors.target_index, [-1]),
+                #    logits=logits)
+                #labels = tf.reshape(input_tensors1.path_target_token_strings)
+                #labels_ = tf.dtypes.cast(labels, tf.int64)
+                #target_ = self.sess.run(target1)
+                #correct_prediction = tf.equal(tf.argmax(logit, 1), label)
+                #correct_pred = tf.equal(tf.argmax(logit, 1), labels_)
+                #a = tf.dtypes.cast(correct_pred, tf.float32)
+                #acc = tf.reduce_mean(a)
+                #accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+                correct = self.sess.run(accuracy)
+                #acc1 = self.sess.run(acc)
+                #optimizer, train_loss, arg, loss1, label, logit
                 sum_loss += batch_loss
+
+
                 if batch_num % self.config.NUM_BATCHES_TO_LOG_PROGRESS == 0:
                     self._trace_training(sum_loss, batch_num, multi_batch_start_time)
                     # Uri: the "shuffle_batch/random_shuffle_queue_Size:0" op does not exist since the migration to the new reader.
@@ -87,18 +125,19 @@ class Code2VecModel(Code2VecModelBase):
                     #    "shuffle_batch/random_shuffle_queue_Size:0"))
                     sum_loss = 0
                     multi_batch_start_time = time.time()
-                if batch_num % num_batches_to_save_and_eval == 0:
+                #if batch_num % num_batches_to_save_and_eval == 0:
+                if batch_num == 20:
                     epoch_num = int((batch_num / num_batches_to_save_and_eval) * self.config.SAVE_EVERY_EPOCHS)
                     model_save_path = self.config.MODEL_SAVE_PATH + '_iter' + str(epoch_num)
                     self.save(model_save_path)
                     self.log('Saved after %d epochs in: %s' % (epoch_num, model_save_path))
                     evaluation_results = self.evaluate()
-                    evaluation_results_str = (str(evaluation_results).replace('topk', 'top{}'.format(
-                        self.config.TOP_K_WORDS_CONSIDERED_DURING_PREDICTION)))
-                    self.log('After {nr_epochs} epochs -- {evaluation_results}'.format(
-                        nr_epochs=epoch_num,
-                        evaluation_results=evaluation_results_str
-                    ))
+                    # evaluation_results_str = (str(evaluation_results).replace('topk', 'top{}'.format(
+                    #     self.config.TOP_K_WORDS_CONSIDERED_DURING_PREDICTION)))
+                    # self.log('After {nr_epochs} epochs -- {evaluation_results}'.format(
+                    #     nr_epochs=epoch_num,
+                    #     evaluation_results=evaluation_results_str
+                    #))
         except tf.errors.OutOfRangeError:
             pass  # The reader iterator is exhausted and have no more batches to produce.
 
@@ -121,13 +160,16 @@ class Code2VecModel(Code2VecModelBase):
             self.eval_input_iterator_reset_op = input_iterator.initializer
             input_tensors = input_iterator.get_next()
 
-            self.eval_top_words_op, self.eval_top_values_op, self.eval_original_names_op, _, _, _, _, \
-                self.eval_code_vectors = self._build_tf_test_graph(input_tensors)
+            #self.eval_top_words_op, self.eval_top_values_op, self.eval_original_names_op, _, _, _, _, \
+            #self.eval_code_vectors = self._build_tf_test_graph(input_tensors)
+            input = self._build_tf_test_graph(input_tensors)
             self.saver = tf.compat.v1.train.Saver()
 
         if self.config.MODEL_LOAD_PATH and not self.config.TRAIN_DATA_PATH_PREFIX:
             self._initialize_session_variables()
             self._load_inner_model(self.sess)
+            self.sess.run(self.eval_input_iterator_reset_op)
+            a, b = self.sess.run(input)
             if self.config.RELEASE:
                 release_name = self.config.MODEL_LOAD_PATH + '.release'
                 self.log('Releasing model, output model: %s' % release_name)
@@ -137,23 +179,27 @@ class Code2VecModel(Code2VecModelBase):
         with open('log.txt', 'w') as log_output_file:
             if self.config.EXPORT_CODE_VECTORS:
                 code_vectors_file = open(self.config.TEST_DATA_PATH + '.vectors', 'w')
-            total_predictions = 0
-            total_prediction_batches = 0
-            subtokens_evaluation_metric = SubtokensEvaluationMetric(
-                partial(common.filter_impossible_names, self.vocabs.target_vocab.special_words))
-            topk_accuracy_evaluation_metric = TopKAccuracyEvaluationMetric(
-                self.config.TOP_K_WORDS_CONSIDERED_DURING_PREDICTION,
-                partial(common.get_first_match_word_from_top_predictions, self.vocabs.target_vocab.special_words))
-            start_time = time.time()
+            # total_predictions = 0
+            # total_prediction_batches = 0
+            # subtokens_evaluation_metric = SubtokensEvaluationMetric(
+            #     partial(common.filter_impossible_names, self.vocabs.target_vocab.special_words))
+            # topk_accuracy_evaluation_metric = TopKAccuracyEvaluationMetric(
+            #     self.config.TOP_K_WORDS_CONSIDERED_DURING_PREDICTION,
+            #     partial(common.get_first_match_word_from_top_predictions, self.vocabs.target_vocab.special_words))
+            # start_time = time.time()
 
             self.sess.run(self.eval_input_iterator_reset_op)
 
             self.log('Starting evaluation')
-
             # Run evaluation in a loop until iterator is exhausted.
             # Each iteration = batch. We iterate as long as the tf iterator (reader) yields batches.
             try:
                 while True:
+                    a = self.sess.run(input.path_indices)
+                    #label = self.sess.run(tf.reshape(input.target_index, [-1]))
+                    c = self.sess.run(input.path_target_token_indices)
+                    d = self.sess.run(input.target_string)
+                    #e = self.sess.run(input.target_index)
                     top_words, top_scores, original_names, code_vectors = self.sess.run(
                         [self.eval_top_words_op, self.eval_top_values_op,
                          self.eval_original_names_op, self.eval_code_vectors],
@@ -184,7 +230,7 @@ class Code2VecModel(Code2VecModelBase):
             log_output_file.write(str(topk_accuracy_evaluation_metric.topk_correct_predictions) + '\n')
         if self.config.EXPORT_CODE_VECTORS:
             code_vectors_file.close()
-        
+
         elapsed = int(time.time() - eval_start_time)
         self.log("Evaluation time: %sH:%sM:%sS" % ((elapsed // 60 // 60), (elapsed // 60) % 60, elapsed % 60))
         return ModelEvaluationResults(
@@ -205,35 +251,55 @@ class Code2VecModel(Code2VecModelBase):
             tokens_vocab = tf.compat.v1.get_variable(
                 self.vocab_type_to_tf_variable_name_mapping[VocabType.Token],
                 shape=(self.vocabs.token_vocab.size, self.config.TOKEN_EMBEDDINGS_SIZE), dtype=tf.float32,
-                initializer=tf.compat.v1.initializers.variance_scaling(scale=1.0, mode='fan_out', distribution="uniform"))
+                initializer=tf.compat.v1.initializers.variance_scaling(scale=1.0, mode='fan_out',
+                                                                       distribution="uniform"))
             targets_vocab = tf.compat.v1.get_variable(
                 self.vocab_type_to_tf_variable_name_mapping[VocabType.Target],
                 shape=(self.vocabs.target_vocab.size, self.config.TARGET_EMBEDDINGS_SIZE), dtype=tf.float32,
-                initializer=tf.compat.v1.initializers.variance_scaling(scale=1.0, mode='fan_out', distribution="uniform"))
+                initializer=tf.compat.v1.initializers.variance_scaling(scale=1.0, mode='fan_out',
+                                                                       distribution="uniform"))
             attention_param = tf.compat.v1.get_variable(
                 'ATTENTION',
                 shape=(self.config.CODE_VECTOR_SIZE, 1), dtype=tf.float32)
             paths_vocab = tf.compat.v1.get_variable(
                 self.vocab_type_to_tf_variable_name_mapping[VocabType.Path],
                 shape=(self.vocabs.path_vocab.size, self.config.PATH_EMBEDDINGS_SIZE), dtype=tf.float32,
-                initializer=tf.compat.v1.initializers.variance_scaling(scale=1.0, mode='fan_out', distribution="uniform"))
+                initializer=tf.compat.v1.initializers.variance_scaling(scale=1.0, mode='fan_out',
+                                                                       distribution="uniform"))
 
             code_vectors, _ = self._calculate_weighted_contexts(
                 tokens_vocab, paths_vocab, attention_param, input_tensors.path_source_token_indices,
                 input_tensors.path_indices, input_tensors.path_target_token_indices, input_tensors.context_valid_mask)
 
             logits = tf.matmul(code_vectors, targets_vocab, transpose_b=True)
+
             batch_size = tf.cast(tf.shape(input_tensors.target_index)[0], dtype=tf.float32)
             loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(
                 labels=tf.reshape(input_tensors.target_index, [-1]),
                 logits=logits)) / batch_size
 
+            labels = tf.reshape(input_tensors.target_index, [-1])
+            #a = tf.shape(labels)
+            #target = tf.reshape(labels,[])
+            #target1 = tf.one_hot(indices=target,depth=a[0],on_value=1,off_value=0)
+            #correct_prediction = tf.equal(tf.argmax(logits, 1), tf.reshape(input_tensors.target_index, [-1]))
+            #accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
             optimizer = tf.compat.v1.train.AdamOptimizer().minimize(loss)
-
-        return optimizer, loss
+            labels_ = tf.reshape(input_tensors.target_index, [-1])
+            labels__ = tf.dtypes.cast(labels_, tf.int64)
+            # target_ = self.sess.run(target1)
+            # correct_prediction = tf.equal(tf.argmax(logit, 1), label)
+            correct_pred = tf.equal(tf.argmax(logits, 1), labels__)
+            a = tf.dtypes.cast(correct_pred, tf.float32)
+            acc = tf.reduce_mean(a)
+            accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+            #correct = self.sess.run(accuracy)
+            #acc1 = self.sess.run(acc)
+        return optimizer, loss, logits, accuracy, labels, input_tensors
 
     def _calculate_weighted_contexts(self, tokens_vocab, paths_vocab, attention_param, source_input, path_input,
                                      target_input, valid_mask, is_evaluating=False):
+
         source_word_embed = tf.nn.embedding_lookup(params=tokens_vocab, ids=source_input)  # (batch, max_contexts, dim)
         path_embed = tf.nn.embedding_lookup(params=paths_vocab, ids=path_input)  # (batch, max_contexts, dim)
         target_word_embed = tf.nn.embedding_lookup(params=tokens_vocab, ids=target_input)  # (batch, max_contexts, dim)
@@ -242,7 +308,7 @@ class Code2VecModel(Code2VecModelBase):
                                   axis=-1)  # (batch, max_contexts, dim * 3)
 
         if not is_evaluating:
-            context_embed = tf.nn.dropout(context_embed, rate=1-self.config.DROPOUT_KEEP_RATE)
+            context_embed = tf.nn.dropout(context_embed, rate=1 - self.config.DROPOUT_KEEP_RATE)
 
         flat_embed = tf.reshape(context_embed, [-1, self.config.context_vector_size])  # (batch * max_contexts, dim * 3)
         transform_param = tf.compat.v1.get_variable(
@@ -293,20 +359,44 @@ class Code2VecModel(Code2VecModelBase):
                 input_tensors.path_indices, input_tensors.path_target_token_indices,
                 input_tensors.context_valid_mask, is_evaluating=True)
 
-        scores = tf.matmul(code_vectors, targets_vocab)  # (batch, target_word_vocab)
+        # scores = tf.matmul(code_vectors, targets_vocab)  # (batch, target_word_vocab)
+        #
+        # topk_candidates = tf.nn.top_k(scores, k=tf.minimum(
+        #     self.config.TOP_K_WORDS_CONSIDERED_DURING_PREDICTION, self.vocabs.target_vocab.size))
+        # top_indices = topk_candidates.indices
+        # top_words = self.vocabs.target_vocab.lookup_word(top_indices)
+        # original_words = input_tensors.target_string
+        # top_scores = topk_candidates.values
+        # if normalize_scores:
+        #     top_scores = tf.nn.softmax(top_scores)
 
-        topk_candidates = tf.nn.top_k(scores, k=tf.minimum(
-            self.config.TOP_K_WORDS_CONSIDERED_DURING_PREDICTION, self.vocabs.target_vocab.size))
-        top_indices = topk_candidates.indices
-        top_words = self.vocabs.target_vocab.lookup_word(top_indices)
-        original_words = input_tensors.target_string
-        top_scores = topk_candidates.values
-        if normalize_scores:
-            top_scores = tf.nn.softmax(top_scores)
 
-        return top_words, top_scores, original_words, attention_weights, input_tensors.path_source_token_strings, \
-               input_tensors.path_strings, input_tensors.path_target_token_strings, code_vectors
+            ###################
 
+            #logits = tf.matmul(code_vectors, targets_vocab)
+
+               # a = tf.shape(labels)
+        # target = tf.reshape(labels,[])
+        # target1 = tf.one_hot(indices=target,depth=a[0],on_value=1,off_value=0)
+        # correct_prediction = tf.equal(tf.argmax(logits, 1), tf.reshape(input_tensors.target_index, [-1]))
+        # accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        #optimizer = tf.compat.v1.train.AdamOptimizer().minimize(loss)
+        #labels_ = tf.reshape(input_tensors.target_index, [-1])
+        #labels_ = tf.reshape(input_tensors.target_index,[-1])
+            #labels_ = tf.reshape(input_tensors.target_index, [-1])
+        #labels__ = tf.dtypes.cast(labels_, tf.int64)
+        # target_ = self.sess.run(target1)
+        # correct_prediction = tf.equal(tf.argmax(logit, 1), label)
+        #correct_pred = tf.equal(tf.argmax(logits, 1), labels__)
+        #a = tf.dtypes.cast(correct_pred, tf.float32)
+        #acc = tf.reduce_mean(a)
+        #accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+        # correct = self.sess.run(accuracy)
+        # acc1 = self.sess.run(acc)
+
+        #return top_words, top_scores, original_words, attention_weights, input_tensors.path_source_token_strings, \
+               #input_tensors.path_strings, input_tensors.path_target_token_strings, code_vectors
+        return input_tensors
     def predict(self, predict_data_lines: Iterable[str]) -> List[ModelPredictionResults]:
         if self.predict_reader is None:
             self.predict_reader = PathContextReader(vocabs=self.vocabs,
@@ -326,12 +416,12 @@ class Code2VecModel(Code2VecModelBase):
 
         prediction_results: List[ModelPredictionResults] = []
         for line in predict_data_lines:
-            batch_top_words, batch_top_scores, batch_original_name, batch_attention_weights, batch_path_source_strings,\
-                batch_path_strings, batch_path_target_strings, batch_code_vectors = self.sess.run(
-                    [self.predict_top_words_op, self.predict_top_values_op, self.predict_original_names_op,
-                     self.attention_weights_op, self.predict_source_string, self.predict_path_string,
-                     self.predict_path_target_string, self.predict_code_vectors],
-                    feed_dict={self.predict_placeholder: line})
+            batch_top_words, batch_top_scores, batch_original_name, batch_attention_weights, batch_path_source_strings, \
+            batch_path_strings, batch_path_target_strings, batch_code_vectors = self.sess.run(
+                [self.predict_top_words_op, self.predict_top_values_op, self.predict_original_names_op,
+                 self.attention_weights_op, self.predict_source_string, self.predict_path_string,
+                 self.predict_path_target_string, self.predict_code_vectors],
+                feed_dict={self.predict_placeholder: line})
             # shapes:
             #   batch_top_words, top_scores: (batch, top_k)
             #   batch_original_name: (batch, )
@@ -517,7 +607,10 @@ class _TFEvaluateModelInputTensorsFormer(ModelInputTensorsFormer):
                input_tensors.path_target_token_indices, input_tensors.context_valid_mask, \
                input_tensors.path_source_token_strings, input_tensors.path_strings, \
                input_tensors.path_target_token_strings
-
+        #return input_tensors.target_string, input_tensors.path_source_token_indices, input_tensors.path_indices, \
+        #       input_tensors.path_target_token_indices, input_tensors.context_valid_mask, \
+        #       input_tensors.path_source_token_strings, input_tensors.path_strings, \
+        #      input_tensors.path_target_token_strings
     def from_model_input_form(self, input_row) -> ReaderInputTensors:
         return ReaderInputTensors(
             target_string=input_row[0],

@@ -32,6 +32,10 @@ def process_file(file_path, data_file_role, dataset_name, word_to_count, path_to
             for line in file:
                 parts = line.rstrip('\n').split(' ')
                 target_name = parts[0]
+                if 'CWE-399' in parts[0]:
+                    target_name = target_name + 'CWE399'
+                elif 'CWE-119' in parts[0]:
+                    target_name = target_name + 'CWE119'
                 contexts = parts[1:]
 
                 if len(contexts) > max_unfiltered:
@@ -62,7 +66,8 @@ def process_file(file_path, data_file_role, dataset_name, word_to_count, path_to
                 sum_sampled += len(contexts)
 
                 csv_padding = " " * (max_contexts - len(contexts))
-                outfile.write(target_name + ' ' + " ".join(contexts) + csv_padding + '\n')
+                if total > 0:
+                    outfile.write(target_name + ' ' + " ".join(contexts) + csv_padding + '\n')
                 total += 1
 
     print('File: ' + data_file_path)
