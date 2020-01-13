@@ -53,14 +53,14 @@ $('#example4').click(function(){
 function sendData(e) {
 var output = [];
 var vulnerability = [];
- var xhr = new XMLHttpRequest();
- xhr.open("POST", "http://203.101.226.215");  //Send the proper header information along with the request
- xhr.setRequestHeader("Content-Type", "application/text");  
+var xhr = new XMLHttpRequest();
+xhr.open("POST", "http://203.101.226.215/staticAnalysis");  //Send the proper header information along with the request
+xhr.setRequestHeader("Content-Type", "application/text");
 xhr.onreadystatechange = function() {
    // Call a function when the state changes.
    if (this.readyState === XMLHttpRequest.DONE && this.status === 200) {
      // Request finished.
-	var json_response = jQuery.parseJSON(event.target.responseText);
+	var json_response = jQuery.parseJSON(this.responseText);
 	$.each(json_response, function(key,value){
 	jsonObject = [];
 	$.each(value, function(key1,value1){
@@ -74,7 +74,6 @@ xhr.onreadystatechange = function() {
 $('#vulnerabilityTextArea').val(output.join("\n"));
 $('#information-alert').hide();
 $('#success-alert').show();
-	console.log(vulnerability);
 	if(vulnerability.indexOf("CWE-120 ") !== -1){
 		$('#cwe-120').show();
 	}
@@ -100,6 +99,10 @@ $('#information-alert').show();
 }
  var form = document.getElementById("static-analysis-form");
  // ...and take over its submit event.
+$( "#submit-button" ).click(function() {
+  $( "#static-analysis-form" ).submit();
+});
+
  form.onsubmit = function(e) {
 e.preventDefault();
 $('#cwe-120').hide();

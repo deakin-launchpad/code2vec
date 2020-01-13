@@ -1,1 +1,2 @@
-img_filename
+initLogFile
+get_nth_ancestor

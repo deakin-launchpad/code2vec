@@ -16,7 +16,7 @@
 # that the proper parameters are set and invoke python.
 
 # Configuration is relative to this script
-source /home/ubuntu/static-analysis-api/code2vec/bin/activate
+source /home/ubuntu/StaticAnalysis/bin/activate
 SCRIPT_LOC=$(realpath "$0")
 SCRIPT_PATH="$(dirname "$SCRIPT_LOC")"
 . $SCRIPT_PATH/../configure.sh
