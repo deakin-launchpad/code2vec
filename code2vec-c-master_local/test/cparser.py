@@ -72,10 +72,8 @@ def main():
             include_path = append_include(dir)
             add_dir_if_exists(inner_dirs, include_path)
             files = glob.glob(dir.rstrip(os.sep) + os.sep + "*.c")
-            files.extend(glob.glob(dir.rstrip(os.sep) + os.sep + "*.cpp"))
             for file in files:
                 try:
-                    #print(file,'I am sure here')
                     parse_single(file, include_dirs + inner_dirs, index)    
                 except:
                     sys.stderr.write("Exception parsing file:"+file+"\n")
@@ -106,7 +104,7 @@ def append_include(path):
     return os.path.join(path, "include")
 
 # Parse a single file print to standard output
-def parse_single(file_path,include_dirs,index):
+def parse_single(file_path, include_dirs, index):
     # Generate random filename for in-memory file
     destname = file_path + format(random.randint(0,99999), '05d') + ".c"
     cmd = ["clang"]
@@ -124,7 +122,7 @@ def parse_single(file_path,include_dirs,index):
     if len(pre_processed_file) <= 0:
         raise Exception("Parsed file is zero length: "+file_path)
     tu = index.parse(destname, unsaved_files=[(destname, pre_processed_file)])
-    root_level(file_path,tu.cursor.get_children())
+    root_level(tu.cursor.get_children())
 
 # Prints tree to stderr, or f if provided
 def traverse_to_print(node, f=sys.stderr):
@@ -147,7 +145,7 @@ def traverse(current_clang, parent=None, depth=0, expansion=False):
     node.SetChildren(children)
     return node
 
-def root_level(file_path,top_nodes):
+def root_level(top_nodes):
     functions = []
     for top_node in top_nodes:
         # Only care about nodes in this file
@@ -161,7 +159,7 @@ def root_level(file_path,top_nodes):
                 func_root = traverse(top_node)
                 functions.append(func_root)
                 if ARGS.dump_tree: traverse_to_print(func_root)
-                generate_and_print_paths(file_path,func_root)
+                generate_and_print_paths(func_root)
             except Exception:    
                 # Print and eat all excptions so we don't stop parsing for one bad function.
                 sys.stderr.write("Exception parsing function:"+top_node.location.__str__()+"\n")
@@ -209,7 +207,7 @@ def normalize_function_name(str):
 
 # Iterate from every leaf to every other leaf printing the path.
 # Doesn't store paths for memory efficency on large functions.
-def generate_and_print_paths(file_path,function, f=sys.stdout):
+def generate_and_print_paths(function, f=sys.stdout):
     decl_tag = "functiondecl_"
     func_name = function.displayname
     leaves = []
@@ -230,13 +228,7 @@ def generate_and_print_paths(file_path,function, f=sys.stdout):
             return
         else:
             func_name = decl_tag + func_name
-    #f.write(normalize_function_name(func_name))
-    if 'CWE-119' in file_path:
-        f.write(normalize_function_name(func_name+"CWEoneonenine"))
-        #    f.write('CWE_119'
-    elif 'CWE-399' in file_path:
-        f.write(normalize_function_name(func_name+'CWEthreeninenine'))
-        #  f.write('CWE_399')
+    f.write(normalize_function_name(func_name))
     for s in leaves:
         uptree = walk_to_root(s)
         for e in leaves:

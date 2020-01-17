@@ -50,12 +50,19 @@ class Code2VecModel(Code2VecModelBase):
                                          model_input_tensors_former=_TFTrainModelInputTensorsFormer(),
                                          config=self.config, estimator_action=EstimatorAction.Train)
 
+        #eval_reader = PathContextReader(vocabs=self.vocabs,
+        #                                model_input_tensors_former=_TFEvaluateModelInputTensorsFormer(),
+        #                                config=self.config, estimator_action=EstimatorAction.Evaluate)
+        #input_iterator2 = tf.compat.v1.data.make_initializable_iterator(eval_reader.get_dataset())
+        #eval_input_iterator_reset_op = input_iterator2.initializer
+        #input_tensors2 = input_iterator2.get_next()
+        #input_tensors3 = _TFEvaluateModelInputTensorsFormer().from_model_input_form(input_tensors2)
         input_iterator = tf.compat.v1.data.make_initializable_iterator(train_reader.get_dataset())
         input_iterator_reset_op = input_iterator.initializer
 
         input_tensors = input_iterator.get_next()
-        input_tensors1 = _TFTrainModelInputTensorsFormer().from_model_input_form(input_tensors)
-        optimizer,train_loss,code2vec,label,logit,input_tensors1 = self._build_tf_training_graph(input_tensors)
+        #input_tensors1 = _TFTrainModelInputTensorsFormer().from_model_input_form(input_tensors)
+        optimizer,train_loss,code2vec,label,logit,input_tensors1,new_lable,target_voca,logits,acc = self._build_tf_training_graph(input_tensors)
 
 
         self.saver = tf.compat.v1.train.Saver(max_to_keep=self.config.MAX_TO_KEEP)
@@ -65,6 +72,12 @@ class Code2VecModel(Code2VecModelBase):
         for variable in tf.compat.v1.trainable_variables():
             self.log("variable name: {} -- shape: {} -- #params: {}".format(
                 variable.name, variable.get_shape(), np.prod(variable.get_shape().as_list())))
+        #keys_tensor = tf.constant(['oneonenine', 'eeninenine'])
+        #vals_tensor = tf.constant([0, 1])
+        # input_tensor = tf.constant(['CWE399', 'CWE119', 'CWE399', 'CWE119', 'CWE399', 'CWE119', 'CWE399', 'CWE119', 'CWE399'])
+        # input
+        #table = tf.lookup.StaticHashTable(
+        #    tf.lookup.KeyValueTensorInitializer(keys_tensor, vals_tensor), -1)
 
         self._initialize_session_variables()
 
@@ -77,38 +90,49 @@ class Code2VecModel(Code2VecModelBase):
         #input_tensors = _TFTrainModelInputTensorsFormer().from_model_input_form(input_tensors)
         self.log('Started reader...')
         #se1 = tf.compat.v2.strings.split('hello|world|d|g|gd|re', sep='|', maxsplit=-1)
+        acc = self.sess.run(acc)
         a = self.sess.run(input_tensors)
+        #input_tensor_test = self.sess.run(input_tensors3)
+        new_label_ = self.sess.run(new_lable)
         a1 = self.sess.run(input_tensors1.target_index)
         b = self.sess.run(code2vec)
         c = self.sess.run(label)
         c = self.sess.run(tf.shape(label))
+        target_voca = self.sess.run(target_voca)
+        logit_ = self.sess.run(logits)
 
         d = self.sess.run(logit)
         #e = self.sess.run(train_reader)
         g = self.sess.run(input_tensors1.path_source_token_indices)
-        k = self.sess.run(input_tensors1.path_indices)
+        #k = self.sess.run(input_tensors1.path_indices)
         p = self.sess.run(input_tensors1.path_target_token_indices)
         g = self.sess.run(input_tensors1.context_valid_mask)
         h = input_tensors1.target_string
+        #k = tf.strings.substr(h, -10, -1)
+        #tabl = table.lookup(k)
 
+        #label_new = self.sess.run(tabl)
+        #shap_ = tf.shape(k)
+        #sh = self.sess.run(shap_)
         se1 = tf.compat.v2.strings.split(h,sep='|',maxsplit=-1)
-        se1_ = self.sess.run(se1)
-        las = se1[:, -1]
+        #se1_ = self.sess.run(k)
+
+        #las = se1[:, -1]
         h_ori = self.sess.run(h)
         #h_sepa = self.sess.run(input_tensors1.target_string)
 
-        las_0 = self.sess.run(las)
+        #las_0 = self.sess.run(las)
         #las_ = self.sess.run(las)
         #h_0 = h[0]
 
         a = tf.strings.regex_full_match(h,"ninenine")
         a1 = self.sess.run(a)
-        subs_1 = tf.strings.substr(h_0,2,10,unit='BYTE',name=None)
-        se = tf.strings.split('fsdfds fdf ff',)
-        h___0 = self.sess.run(se)
-        h__0 = self.sess.run(h_0)
+        #subs_1 = tf.strings.substr(h_0,2,10,unit='BYTE',name=None)
+        #se = tf.strings.split('fsdfds fdf ff',)
+        #h___0 = self.sess.run(se)
+        #h__0 = self.sess.run(h_0)
 
-        subs__1  = self.sess.run(subs_1)
+        #subs__1  = self.sess.run(subs_1)
         subs = tf.strings.substr(input_tensors1.target_string,1,7,unit='BYTE',name=None)
         sub = self.sess.run(subs)
         #for i in range(h):
@@ -140,12 +164,13 @@ class Code2VecModel(Code2VecModelBase):
                     #    "shuffle_batch/random_shuffle_queue_Size:0"))
                     sum_loss = 0
                     multi_batch_start_time = time.time()
-                if batch_num % num_batches_to_save_and_eval == 0:
+                #if batch_num % num_batches_to_save_and_eval == 0:
+                if batch_num == 5:
                     epoch_num = int((batch_num / num_batches_to_save_and_eval) * self.config.SAVE_EVERY_EPOCHS)
                     model_save_path = self.config.MODEL_SAVE_PATH + '_iter' + str(epoch_num)
                     self.save(model_save_path)
                     self.log('Saved after %d epochs in: %s' % (epoch_num, model_save_path))
-                    #evaluation_results = self.evaluate()
+                    evaluation_results = self.evaluate()
                     #evaluation_results_str = (str(evaluation_results).replace('topk', 'top{}'.format(
                         #self.config.TOP_K_WORDS_CONSIDERED_DURING_PREDICTION)))
                     #self.log('After {nr_epochs} epochs -- {evaluation_results}'.format(
@@ -173,14 +198,22 @@ class Code2VecModel(Code2VecModelBase):
             input_iterator = tf.compat.v1.data.make_initializable_iterator(self.eval_reader.get_dataset())
             self.eval_input_iterator_reset_op = input_iterator.initializer
             input_tensors = input_iterator.get_next()
+            acc, input_tensors1 = self._build_tf_test_graph(input_tensors)
+            #input_tensors1 = _TFEvaluateModelInputTensorsFormer().from_model_input_form(input_tensors)
+            #self.eval_top_words_op, self.eval_top_values_op, self.eval_original_names_op, _, _, _, _, \
+            #    self.eval_code_vectors = self._build_tf_test_graph(input_tensors)
+            #self.eval_top_words_op, self.eval_top_values_op, self.eval_original_names_op, _, _, _, _, \
 
-            self.eval_top_words_op, self.eval_top_values_op, self.eval_original_names_op, _, _, _, _, \
-                self.eval_code_vectors = self._build_tf_test_graph(input_tensors)
+            #self._initialize_session_variables()
             self.saver = tf.compat.v1.train.Saver()
-
-        if self.config.MODEL_LOAD_PATH and not self.config.TRAIN_DATA_PATH_PREFIX:
+            #input = self.sess.run(input_tensors1)
+            #ACC = self.sess.run(input_tensors)
+            #if self.config.MODEL_LOAD_PATH and not self.config.TRAIN_DATA_PATH_PREFIX:
             self._initialize_session_variables()
             self._load_inner_model(self.sess)
+            self.sess.run(self.eval_input_iterator_reset_op)
+            acc = self.sess.run(acc)
+            input = self.sess.run(input_tensors1)
             if self.config.RELEASE:
                 release_name = self.config.MODEL_LOAD_PATH + '.release'
                 self.log('Releasing model, output model: %s' % release_name)
@@ -256,14 +289,32 @@ class Code2VecModel(Code2VecModelBase):
 
         with tf.compat.v1.variable_scope('model'):
             #self.sess = tf.compat.v1.Session()
+
+            keys_tensor = tf.constant(['oneonenine', 'eeninenine'])
+            vals_tensor = tf.constant([0, 1])
+            table = tf.lookup.StaticHashTable(
+                tf.lookup.KeyValueTensorInitializer(keys_tensor, vals_tensor), -1)
+
+            h = input_tensors.target_string
+            k = tf.strings.substr(h, -10, -1)
+            tabl = table.lookup(k)
+
+
+
+            #endddddddddddddddddddddddddddddd
             tokens_vocab = tf.compat.v1.get_variable(
                 self.vocab_type_to_tf_variable_name_mapping[VocabType.Token],
                 shape=(self.vocabs.token_vocab.size, self.config.TOKEN_EMBEDDINGS_SIZE), dtype=tf.float32,
                 initializer=tf.compat.v1.initializers.variance_scaling(scale=1.0, mode='fan_out', distribution="uniform"))
+            #targets_vocab = tf.compat.v1.get_variable(
+                #self.vocab_type_to_tf_variable_name_mapping[VocabType.Target],
+                #shape=(self.vocabs.target_vocab.size, self.config.TARGET_EMBEDDINGS_SIZE), dtype=tf.float32,
+                #initializer=tf.compat.v1.initializers.variance_scaling(scale=1.0, mode='fan_out', distribution="uniform"))
             targets_vocab = tf.compat.v1.get_variable(
                 self.vocab_type_to_tf_variable_name_mapping[VocabType.Target],
-                shape=(self.vocabs.target_vocab.size, self.config.TARGET_EMBEDDINGS_SIZE), dtype=tf.float32,
-                initializer=tf.compat.v1.initializers.variance_scaling(scale=1.0, mode='fan_out', distribution="uniform"))
+                shape=(2, self.config.TARGET_EMBEDDINGS_SIZE), dtype=tf.float32,
+                initializer=tf.compat.v1.initializers.variance_scaling(scale=1.0, mode='fan_out',
+                                                                       distribution="uniform"))
             attention_param = tf.compat.v1.get_variable(
                 'ATTENTION',
                 shape=(self.config.CODE_VECTOR_SIZE, 1), dtype=tf.float32)
@@ -279,14 +330,26 @@ class Code2VecModel(Code2VecModelBase):
             logits = tf.matmul(code_vectors, targets_vocab, transpose_b=True)
 
             batch_size = tf.cast(tf.shape(input_tensors.target_index)[0], dtype=tf.float32)
+            #loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(
+                #labels=tf.reshape(input_tensors.target_index, [-1]),
+                #logits=logits)) / batch_size
             loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(
-                labels=tf.reshape(input_tensors.target_index, [-1]),
+                labels=tf.reshape(tabl, [-1]),
                 logits=logits)) / batch_size
-
             optimizer = tf.compat.v1.train.AdamOptimizer().minimize(loss)
+
+            labels_ = tf.reshape(tabl, [-1])
+            labels__ = tf.dtypes.cast(labels_, tf.int64)
+            # target_ = self.sess.run(target1)
+            # correct_prediction = tf.equal(tf.argmax(logit, 1), label)
+            correct_pred = tf.equal(tf.argmax(logits, 1), labels__)
+            a = tf.dtypes.cast(correct_pred, tf.float32)
+            acc = tf.reduce_mean(a)
+            accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+
             #b = self.sess.run(code_vectors)
             label = input_tensors.target_index
-        return optimizer, loss,code_vectors,label,logits,input_tensors
+        return optimizer, loss,code_vectors,label,logits,input_tensors,tabl,targets_vocab,logits,acc
 
     def _calculate_weighted_contexts(self, tokens_vocab, paths_vocab, attention_param, source_input, path_input,
                                      target_input, valid_mask, is_evaluating=False):
@@ -321,14 +384,29 @@ class Code2VecModel(Code2VecModelBase):
         return code_vectors, attention_weights
 
     def _build_tf_test_graph(self, input_tensors, normalize_scores=False):
+        input_tensors = _TFEvaluateModelInputTensorsFormer().from_model_input_form(input_tensors)
         with tf.compat.v1.variable_scope('model', reuse=self.get_should_reuse_variables()):
+            keys_tensor1 = tf.constant(['oneonenine', 'eeninenine'])
+            vals_tensor1 = tf.constant([0, 1])
+            table1 = tf.lookup.StaticHashTable(
+                tf.lookup.KeyValueTensorInitializer(keys_tensor1, vals_tensor1), -1)
+
+            h = input_tensors.target_string
+            k = tf.strings.substr(h, -10, -1)
+            tabl1 = table1.lookup(k)
+            #endddddddddddddddddddddddddddddddddddddddddddd
             tokens_vocab = tf.compat.v1.get_variable(
                 self.vocab_type_to_tf_variable_name_mapping[VocabType.Token],
                 shape=(self.vocabs.token_vocab.size, self.config.TOKEN_EMBEDDINGS_SIZE),
                 dtype=tf.float32, trainable=False)
+            #targets_vocab = tf.compat.v1.get_variable(
+            #    self.vocab_type_to_tf_variable_name_mapping[VocabType.Target],
+            #    shape=(self.vocabs.target_vocab.size, self.config.TARGET_EMBEDDINGS_SIZE),
+            #    dtype=tf.float32, trainable=False)
+
             targets_vocab = tf.compat.v1.get_variable(
                 self.vocab_type_to_tf_variable_name_mapping[VocabType.Target],
-                shape=(self.vocabs.target_vocab.size, self.config.TARGET_EMBEDDINGS_SIZE),
+                shape=(2, self.config.TARGET_EMBEDDINGS_SIZE),
                 dtype=tf.float32, trainable=False)
             attention_param = tf.compat.v1.get_variable(
                 'ATTENTION', shape=(self.config.context_vector_size, 1),
@@ -338,10 +416,10 @@ class Code2VecModel(Code2VecModelBase):
                 shape=(self.vocabs.path_vocab.size, self.config.PATH_EMBEDDINGS_SIZE),
                 dtype=tf.float32, trainable=False)
 
-            targets_vocab = tf.transpose(targets_vocab)  # (dim * 3, target_word_vocab)
+            #targets_vocab = tf.transpose(targets_vocab)  # (dim * 3, target_word_vocab)
 
             # Use `_TFEvaluateModelInputTensorsFormer` to access input tensors by name.
-            input_tensors = _TFEvaluateModelInputTensorsFormer().from_model_input_form(input_tensors)
+
             # shape of (batch, 1) for input_tensors.target_string
             # shape of (batch, max_contexts) for the other tensors
 
@@ -350,20 +428,34 @@ class Code2VecModel(Code2VecModelBase):
                 input_tensors.path_indices, input_tensors.path_target_token_indices,
                 input_tensors.context_valid_mask, is_evaluating=True)
 
-        scores = tf.matmul(code_vectors, targets_vocab)  # (batch, target_word_vocab)
+        scores = tf.matmul(code_vectors, targets_vocab,transpose_b=True)  # (batch, target_word_vocab)
+        #batch_size = tf.cast(tf.shape(input_tensors.target_index)[0], dtype=tf.float32)
+        # loss = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(
+        # labels=tf.reshape(input_tensors.target_index, [-1]),
+        # logits=logits)) / batch_size
 
-        topk_candidates = tf.nn.top_k(scores, k=tf.minimum(
-            self.config.TOP_K_WORDS_CONSIDERED_DURING_PREDICTION, self.vocabs.target_vocab.size))
-        top_indices = topk_candidates.indices
-        top_words = self.vocabs.target_vocab.lookup_word(top_indices)
-        original_words = input_tensors.target_string
-        top_scores = topk_candidates.values
-        if normalize_scores:
-            top_scores = tf.nn.softmax(top_scores)
 
-        return top_words, top_scores, original_words, attention_weights, input_tensors.path_source_token_strings, \
-               input_tensors.path_strings, input_tensors.path_target_token_strings, code_vectors
 
+        labels_ = tf.reshape(tabl1, [-1])
+        labels__ = tf.dtypes.cast(labels_, tf.int64)
+        # target_ = self.sess.run(target1)
+        # correct_prediction = tf.equal(tf.argmax(logit, 1), label)
+        correct_pred = tf.equal(tf.argmax(scores, 1), labels__)
+        a = tf.dtypes.cast(correct_pred, tf.float32)
+        # topk_candidates = tf.nn.top_k(scores, k=tf.minimum(
+        #     self.config.TOP_K_WORDS_CONSIDERED_DURING_PREDICTION, self.vocabs.target_vocab.size))
+        # top_indices = topk_candidates.indices
+        # top_words = self.vocabs.target_vocab.lookup_word(top_indices)
+        # original_words = input_tensors.target_string
+        # top_scores = topk_candidates.values
+        # if normalize_scores:
+        #     top_scores = tf.nn.softmax(top_scores)
+
+        #return top_words, top_scores, original_words, attention_weights, input_tensors.path_source_token_strings, \
+        #       input_tensors.path_strings, input_tensors.path_target_token_strings, code_vectors
+        acc = tf.reduce_mean(a)
+        accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+        return acc, input_tensors
     def predict(self, predict_data_lines: Iterable[str]) -> List[ModelPredictionResults]:
         if self.predict_reader is None:
             self.predict_reader = PathContextReader(vocabs=self.vocabs,
@@ -428,8 +520,12 @@ class Code2VecModel(Code2VecModelBase):
 
     def _load_inner_model(self, sess=None):
         if sess is not None:
-            self.log('Loading model weights from: ' + self.config.MODEL_LOAD_PATH)
-            self.saver.restore(sess, self.config.MODEL_LOAD_PATH)
+            #self.log('Loading model weights from: ' + self.config.MODEL_LOAD_PATH)
+            self.log('Loading model weights from: ' + '/home/dung/Downloads/Mohamed/code2vec-master_local/models/git'
+                                                      '-repos-32/saved_model_iter0')
+            #self.saver.restore(sess, self.config.MODEL_LOAD_PATH)
+            self.saver.restore(sess, '/home/dung/Downloads/Mohamed/code2vec-master_local/models/git-repos-32'
+                                     '/saved_model_iter0')
             self.log('Done loading model weights')
 
     def _get_vocab_embedding_as_np_array(self, vocab_type: VocabType) -> np.ndarray:
@@ -486,7 +582,11 @@ class Code2VecModel(Code2VecModelBase):
             tf.compat.v1.tables_initializer()))
         self.log('Initalized variables')
 
-
+    def _initialize_session_variables1(self):
+        self.sess.run(tf.group(
+            tf.compat.v1.global_variables_initializer(),
+            tf.compat.v1.local_variables_initializer()))
+        self.log('Initalized variables')
 class SubtokensEvaluationMetric:
     def __init__(self, filter_impossible_names_fn):
         self.nr_true_positives: int = 0
@@ -565,7 +665,7 @@ class _TFTrainModelInputTensorsFormer(ModelInputTensorsFormer):
             path_indices=input_row[2],
             path_target_token_indices=input_row[3],
             context_valid_mask=input_row[4],
-            target_string = input_row[5],
+            target_string=input_row[5]
         )
 
 

@@ -72,7 +72,7 @@ def main():
             include_path = append_include(dir)
             add_dir_if_exists(inner_dirs, include_path)
             files = glob.glob(dir.rstrip(os.sep) + os.sep + "*.c")
-            files.extend(glob.glob(dir.rstrip(os.sep) + os.sep + "*.cpp"))
+            files.extend(glob.glob(dir.rstrip(os.sep) + os.sep + "*.cpp"))# to load .cpp file
             for file in files:
                 try:
                     #print(file,'I am sure here')
@@ -230,13 +230,13 @@ def generate_and_print_paths(file_path,function, f=sys.stdout):
             return
         else:
             func_name = decl_tag + func_name
-    #f.write(normalize_function_name(func_name))
+    #f.write(normalize_function_name(func_name)+file_path)
     if 'CWE-119' in file_path:
-        f.write(normalize_function_name(func_name+"CWEoneonenine"))
-        #    f.write('CWE_119'
+        func_name = func_name + 'CWE119'
+        f.write(normalize_function_name(func_name)
     elif 'CWE-399' in file_path:
-        f.write(normalize_function_name(func_name+'CWEthreeninenine'))
-        #  f.write('CWE_399')
+        func_name = func_name + 'CWE119'
+        f.write(normalize_function_name(func_name)
     for s in leaves:
         uptree = walk_to_root(s)
         for e in leaves:
