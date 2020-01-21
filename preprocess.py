@@ -32,10 +32,11 @@ def process_file(file_path, data_file_role, dataset_name, word_to_count, path_to
             for line in file:
                 parts = line.rstrip('\n').split(' ')
                 target_name = parts[0]
-                if 'CWE-399' in parts[0]:
-                    target_name = target_name + 'CWE399'
-                elif 'CWE-119' in parts[0]:
-                    target_name = target_name + 'CWE119'
+                #if 'CWE-399' in parts[0]:
+                #    target_name = target_name + 'CWE399'
+                #elif 'CWE-119' in parts[0]:
+                #   target_name = target_name + 'CWE119'
+
                 contexts = parts[1:]
 
                 if len(contexts) > max_unfiltered:
@@ -66,8 +67,7 @@ def process_file(file_path, data_file_role, dataset_name, word_to_count, path_to
                 sum_sampled += len(contexts)
 
                 csv_padding = " " * (max_contexts - len(contexts))
-                if total > 0:
-                    outfile.write(target_name + ' ' + " ".join(contexts) + csv_padding + '\n')
+                outfile.write(target_name + ' ' + " ".join(contexts) + csv_padding + '\n')
                 total += 1
 
     print('File: ' + data_file_path)
@@ -91,27 +91,27 @@ def context_partial_found(context_parts, word_to_count, path_to_count):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument("-trd", "--train_data", dest="train_data_path",
+    parser.add_argument("--train_data", dest="train_data_path",
                         help="path to training data file", required=True)
-    parser.add_argument("-ted", "--test_data", dest="test_data_path",
+    parser.add_argument("--test_data", dest="test_data_path",
                         help="path to test data file", required=True)
-    parser.add_argument("-vd", "--val_data", dest="val_data_path",
+    parser.add_argument("--val_data", dest="val_data_path",
                         help="path to validation data file", required=True)
-    parser.add_argument("-mc", "--max_contexts", dest="max_contexts", default=200,
+    parser.add_argument("--max_contexts", dest="max_contexts", default=200,
                         help="number of max contexts to keep", required=False)
-    parser.add_argument("-wvs", "--word_vocab_size", dest="word_vocab_size", default=1301136,
+    parser.add_argument("--word_vocab_size", dest="word_vocab_size", default=1301136,
                         help="Max number of origin word in to keep in the vocabulary", required=False)
-    parser.add_argument("-pvs", "--path_vocab_size", dest="path_vocab_size", default=911417,
+    parser.add_argument("--path_vocab_size", dest="path_vocab_size", default=911417,
                         help="Max number of paths to keep in the vocabulary", required=False)
-    parser.add_argument("-tvs", "--target_vocab_size", dest="target_vocab_size", default=261245,
+    parser.add_argument("--target_vocab_size", dest="target_vocab_size", default=261245,
                         help="Max number of target words to keep in the vocabulary", required=False)
-    parser.add_argument("-wh", "--word_histogram", dest="word_histogram",
+    parser.add_argument("--word_histogram", dest="word_histogram",
                         help="word histogram file", metavar="FILE", required=True)
-    parser.add_argument("-ph", "--path_histogram", dest="path_histogram",
+    parser.add_argument("--path_histogram", dest="path_histogram",
                         help="path_histogram file", metavar="FILE", required=True)
-    parser.add_argument("-th", "--target_histogram", dest="target_histogram",
+    parser.add_argument("--target_histogram", dest="target_histogram",
                         help="target histogram file", metavar="FILE", required=True)
-    parser.add_argument("-o", "--output_name", dest="output_name",
+    parser.add_argument("--output_name", dest="output_name",
                         help="output name - the base name for the created dataset", metavar="FILE", required=True,
                         default='data')
     args = parser.parse_args()
